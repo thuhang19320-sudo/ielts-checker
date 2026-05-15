@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>IELTS Writing Checker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; }
+  .tab-active { color: #059669; border-bottom: 2px solid #059669; }
+  .nav-active { color: #059669; }
+  .nav-active svg { stroke: #059669; }
+  .band-bar { transition: width 0.8s ease; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .error-card { border-left: 4px solid; }
+  .error-grammar { border-color: #ef4444; background: #fef2f2; }
+  .error-spelling { border-color: #f97316; background: #fff7ed; }
+  .error-vocabulary { border-color: #eab308; background: #fefce8; }
+  .error-logic { border-color: #8b5cf6; background: #f5f3ff; }
+  .fade-in { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:translateY(0);} }
+  .spinner { border: 3px solid #e2e8f0; border-top: 3px solid #059669; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  textarea:focus { outline: none; box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15); }
+  .btn-primary { background: #059669; color: white; border-radius: 12px; padding: 14px; font-weight: 600; font-size: 16px; width: 100%; transition: all 0.2s; }
+  .btn-primary:hover { background: #047857; }
+  .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+  .input-field { border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; width: 100%; font-size: 15px; transition: border 0.2s; }
+  .input-field:focus { outline: none; border-color: #059669; }
+  .card { background: white; border-radius: 16px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; }
+  .band-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #059669, #0d9488); color: white; box-shadow: 0 4px 15px rgba(5,150,105,0.3); }
+  select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  .improved-essay { white-space: pre-wrap; line-height: 1.8; font-size: 14px; color: #374151; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="auth-screen" class="screen active min-h-screen flex flex-col">
+  <div class="flex-1 flex flex-col justify-center px-6 py-12 max-w-sm mx-auto w-full">
+    <div class="text-center mb-8">
+      <div class="text-4xl mb-3">✍️</div>
+      <h1 class="text-2xl font-bold text-gray-800">IELTS Writing Checker</h1>
+      <p class="text-gray-500 text-sm mt-1">AI-powered essay evaluation</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-6">
+      <button onclick="switchAuthTab('login')" id="login-tab" class="flex-1 py-2 text-sm font-semibold tab-active" >Sign In</button>
+      <button onclick="switchAuthTab('register')" id="register-tab" class="flex-1 py-2 text-sm font-semibold text-gray-500">Create Account</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form">
+      <div class="space-y-3">
+        <input type="email" id="login-email" class="input-field" placeholder="Email address"/>
+        <input type="password" id="login-password" class="input-field" placeholder="Password"/>
+        <div id="login-error" class="text-red-500 text-sm hidden"></div>
+        <button onclick="handleLogin()" class="btn-primary">Sign In</button>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form" class="hidden">
+      <div class="space-y-3">
+        <input type="email" id="reg-email" class="input-field" placeholder="Email address"/>
+        <input type="password" id="reg-password" class="input-field" placeholder="Password (min 8 characters)"/>
+        <div id="reg-error" class="text-red-500 text-sm hidden"></div>
+        <button onclick="handleRegister()" class="btn-primary">Create Account</button>
+      </div>
+    </div>
+
+    <p class="text-center text-gray-400 text-xs mt-6">By continuing, you agree to our Terms of Service</p>
+  </div>
+</div>
+
+<!-- ===== MAIN APP SCREEN ===== -->
+<div id="app-screen" class="screen min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <div class="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+    <div>
+      <h1 class="font-bold text-gray-800 text-base">IELTS Writing Checker</h1>
+      <p id="user-email-display" class="text-xs text-gray-400"></p>
+    </div>
+    <button onclick="handleLogout()" class="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">Logout</button>
+  </div>
+
+  <!-- Content Area -->
+  <div class="flex-1 overflow-y-auto pb-20">
+
+    <!-- CHECK TAB -->
+    <div id="tab-check" class="tab-content active px-4 pt-4 fade-in">
+      <div class="card">
+        <h2 class="font-semibold text-gray-700 mb-3 text-sm">Essay Settings</h2>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Task Type</label>
+            <select id="task-type" class="input-field text-sm bg-white">
+              <option value="Task 2">Task 2 (Opinion)</option>
+              <option value="Task 1">Task 1 (Report)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">Target Band</label>
+            <select id="target-band" class="input-field text-sm bg-white">
+              <option value="6.0">Band 6.0</option>
+              <option value="6.5" selected>Band 6.5</option>
+              <option value="7.0">Band 7.0</option>
+              <option value="7.5">Band 7.5</option>
+              <option value="8.0">Band 8.0</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-semibold text-gray-700 text-sm">Your Essay</h2>
+          <span id="word-count" class="text-xs text-gray-400">0 words</span>
+        </div>
+        <textarea
+          id="essay-input"
+          class="w-full border-1.5 border-gray-200 rounded-xl p-3 text-sm text-gray-700 resize-none"
+          style="height:260px; border: 1.5px solid #e5e7eb;"
+          placeholder="Paste or type your IELTS essay here...&#10;&#10;Tip: Task 2 essays should be at least 250 words."
+          oninput="updateWordCount()"
+        ></textarea>
+        <div class="flex justify-between items-center mt-2">
+          <span class="text-xs text-gray-400">Min: 100 words</span>
+          <button onclick="clearEssay()" class="text-xs text-gray-400 underline">Clear</button>
+        </div>
+      </div>
+
+      <div id="submit-error" class="text-red-500 text-sm mb-3 hidden px-1"></div>
+      <button id="check-btn" onclick="submitEssay()" class="btn-primary mb-4">
+        🔍 Check My Essay
+      </button>
+    </div>
+
+    <!-- LOADING STATE -->
+    <div id="tab-loading" class="tab-content px-4 pt-16 flex flex-col items-center">
+      <div class="spinner mb-6"></div>
+      <h2 class="font-semibold text-gray-700 text-lg mb-2">Analyzing Your Essay</h2>
+      <p class="text-gray-500 text-sm text-center">Our AI examiner is carefully evaluating your writing...<br/>This may take 20-30 seconds.</p>
+      <div class="mt-6 space-y-2 w-full max-w-xs">
+        <div id="loading-step-1" class="flex items-center text-sm text-green-600"><span class="mr-2">✅</span>Essay received</div>
+        <div id="loading-step-2" class="flex items-center text-sm text-gray-400"><span class="mr-2">⏳</span>Checking grammar & vocabulary</div>
+        <div id="loading-step-3" class="flex items-center text-sm text-gray-400"><span class="mr-2">⏳</span>Scoring by IELTS criteria</div>
+        <div id="loading-step-4" class="flex items-center text-sm text-gray-400"><span class="mr-2">⏳</span>Generating improved essay</div>
+      </div>
+    </div>
+
+    <!-- RESULTS TAB -->
+    <div id="tab-results" class="tab-content px-4 pt-4 fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-bold text-gray-800 text-lg">Your Results</h2>
+        <button onclick="showTab('check')" class="text-sm text-emerald-600 font-medium bg-emerald-50 px-3 py-1.5 rounded-full">+ New Essay</button>
+      </div>
+
+      <!-- Band Score -->
+      <div class="card flex items-center gap-4">
+        <div class="band-circle" id="result-overall-circle">–</div>
+        <div class="flex-1">
+          <p class="text-xs text-gray-500 mb-1">Overall Band Score</p>
+          <div class="text-2xl font-bold text-gray-800" id="result-overall">–</div>
+          <p class="text-xs text-gray-500 mt-0.5" id="result-word-count"></p>
+        </div>
+      </div>
+
+      <!-- Criterion Scores -->
+      <div class="card">
+        <h3 class="font-semibold text-gray-700 text-sm mb-3">Criterion Breakdown</h3>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Task Response</span><span class="font-semibold" id="score-tr">–</span></div>
+            <div class="bg-gray-100 rounded-full h-2"><div id="bar-tr" class="bg-emerald-500 h-2 rounded-full band-bar" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Coherence & Cohesion</span><span class="font-semibold" id="score-cc">–</span></div>
+            <div class="bg-gray-100 rounded-full h-2"><div id="bar-cc" class="bg-blue-500 h-2 rounded-full band-bar" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Lexical Resource</span><span class="font-semibold" id="score-lr">–</span></div>
+            <div class="bg-gray-100 rounded-full h-2"><div id="bar-lr" class="bg-purple-500 h-2 rounded-full band-bar" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Grammar Accuracy</span><span class="font-semibold" id="score-ga">–</span></div>
+            <div class="bg-gray-100 rounded-full h-2"><div id="bar-ga" class="bg-orange-500 h-2 rounded-full band-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="card">
+        <h3 class="font-semibold text-gray-700 text-sm mb-3">📝 Detailed Feedback</h3>
+        <div class="mb-3">
+          <p class="text-xs font-semibold text-emerald-600 mb-1">✅ Strengths</p>
+          <p id="feedback-strengths" class="text-sm text-gray-600 leading-relaxed"></p>
+        </div>
+        <div class="mb-3">
+          <p class="text-xs font-semibold text-red-500 mb-1">⚠️ Areas to Improve</p>
+          <p id="feedback-weaknesses" class="text-sm text-gray-600 leading-relaxed"></p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-blue-600 mb-1">💡 Suggestions</p>
+          <p id="feedback-suggestions" class="text-sm text-gray-600 leading-relaxed"></p>
+        </div>
+      </div>
+
+      <!-- Errors -->
+      <div class="card">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-700 text-sm">🔍 Errors Found</h3>
+          <span id="error-count" class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full"></span>
+        </div>
+        <div id="errors-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Improved Essay -->
+      <div class="card">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-700 text-sm">✨ Improved Essay</h3>
+          <span id="improved-band-label" class="text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full"></span>
+        </div>
+        <div id="improved-essay" class="improved-essay bg-gray-50 rounded-xl p-3 text-sm"></div>
+        <button onclick="copyImprovedEssay()" class="mt-3 w-full text-sm text-emerald-600 border border-emerald-300 rounded-xl py-2 font-medium">📋 Copy Improved Essay</button>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content px-4 pt-4 fade-in">
+      <h2 class="font-bold text-gray-800 text-lg mb-4">Your Progress</h2>
+
+      <!-- Chart -->
+      <div class="card" id="chart-container" style="display:none;">
+        <h3 class="font-semibold text-gray-700 text-sm mb-3">📈 Band Score Trend</h3>
+        <canvas id="progress-chart" height="120"></canvas>
+      </div>
+
+      <!-- Stats -->
+      <div id="stats-cards" class="grid grid-cols-3 gap-2 mb-4" style="display:none;">
+        <div class="card text-center p-3">
+          <p class="text-xl font-bold text-emerald-600" id="stat-total">0</p>
+          <p class="text-xs text-gray-500">Essays</p>
+        </div>
+        <div class="card text-center p-3">
+          <p class="text-xl font-bold text-blue-600" id="stat-best">–</p>
+          <p class="text-xs text-gray-500">Best Band</p>
+        </div>
+        <div class="card text-center p-3">
+          <p class="text-xl font-bold text-purple-600" id="stat-avg">–</p>
+          <p class="text-xs text-gray-500">Average</p>
+        </div>
+      </div>
+
+      <!-- History List -->
+      <div id="history-list"></div>
+      <div id="history-empty" class="text-center py-12">
+        <p class="text-4xl mb-3">📄</p>
+        <p class="text-gray-500 text-sm">No essays yet. Submit your first essay!</p>
+        <button onclick="showTab('check')" class="mt-4 btn-primary" style="width:auto; padding: 10px 24px;">Start Writing</button>
+      </div>
+    </div>
+
+    <!-- SAMPLES TAB -->
+    <div id="tab-samples" class="tab-content px-4 pt-4 fade-in">
+      <h2 class="font-bold text-gray-800 text-lg mb-4">Sample Essays</h2>
+      <div id="samples-list" class="space-y-3"></div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex z-10" style="padding-bottom: env(safe-area-inset-bottom);">
+    <button onclick="showTab('check')" id="nav-check" class="flex-1 flex flex-col items-center py-3 text-gray-400 nav-active">
+      <svg width="22" height="22" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <span class="text-xs mt-0.5 font-medium" style="color:#059669">Check</span>
+    </button>
+    <button onclick="showTab('history')" id="nav-history" class="flex-1 flex flex-col items-center py-3 text-gray-400">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="text-xs mt-0.5 font-medium">History</span>
+    </button>
+    <button onclick="showTab('samples')" id="nav-samples" class="flex-1 flex flex-col items-center py-3 text-gray-400">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span class="text-xs mt-0.5 font-medium">Samples</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== FIREBASE + APP LOGIC ===== -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase Config ──────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCaTf7cDgFoqv1Qo0rYmla7YKuRUuxY1wo",
+  authDomain: "eloquent-f9458.firebaseapp.com",
+  projectId: "eloquent-f9458",
+  storageBucket: "eloquent-f9458.firebasestorage.app",
+  messagingSenderId: "42430532355",
+  appId: "1:42430532355:web:3e0fb825322abf33eef736"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── Auth State ───────────────────────────────────
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    showScreen('app-screen');
+    document.getElementById('user-email-display').textContent = user.email;
+    showTab('check');
+  } else {
+    showScreen('auth-screen');
+  }
+});
+
+// ── Auth Functions ───────────────────────────────
+window.handleLogin = async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  if (!email || !pwd) { showErr(errEl, 'Please fill in all fields.'); return; }
+  try {
+    await signInWithEmailAndPassword(auth, email, pwd);
+  } catch (e) {
+    showErr(errEl, getFriendlyError(e.code));
+  }
+};
+
+window.handleRegister = async () => {
+  const email = document.getElementById('reg-email').value.trim();
+  const pwd = document.getElementById('reg-password').value;
+  const errEl = document.getElementById('reg-error');
+  errEl.classList.add('hidden');
+  if (!email || !pwd) { showErr(errEl, 'Please fill in all fields.'); return; }
+  if (pwd.length < 8) { showErr(errEl, 'Password must be at least 8 characters.'); return; }
+  try {
+    await createUserWithEmailAndPassword(auth, email, pwd);
+  } catch (e) {
+    showErr(errEl, getFriendlyError(e.code));
+  }
+};
+
+window.handleLogout = async () => {
+  if (confirm('Sign out?')) await signOut(auth);
+};
+
+// ── Essay Submission ─────────────────────────────
+window.submitEssay = async () => {
+  const essay = document.getElementById('essay-input').value.trim();
+  const taskType = document.getElementById('task-type').value;
+  const targetBand = document.getElementById('target-band').value;
+  const errEl = document.getElementById('submit-error');
+  errEl.classList.add('hidden');
+
+  const words = essay.split(/\s+/).filter(w => w.length > 0).length;
+  if (words < 100) { showErr(errEl, `Essay is too short (${words} words). Minimum 100 words required.`); return; }
+
+  // Show loading
+  showTab('loading');
+  animateLoadingSteps();
+
+  try {
+    const res = await fetch('/api/api/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ essay, taskType, targetBand })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Evaluation failed');
+
+    // Save to Firestore
+    try {
+      await addDoc(collection(db, 'essays'), {
+        user_id: auth.currentUser.uid,
+        essay_text: essay,
+        task_type: taskType,
+        target_band: parseFloat(targetBand),
+        overall_band: data.overall_band,
+        task_response: data.task_response,
+        coherence_cohesion: data.coherence_cohesion,
+        lexical_resource: data.lexical_resource,
+        grammatical_accuracy: data.grammatical_accuracy,
+        word_count: data.word_count || words,
+        feedback: { strengths: data.strengths, weaknesses: data.weaknesses, suggestions: data.suggestions },
+        errors: data.errors || [],
+        improved_essay: data.improved_essay,
+        created_at: serverTimestamp()
+      });
+    } catch(fsErr) { console.warn('Firestore save failed:', fsErr); }
+
+    displayResults(data, targetBand);
+    showTab('results');
+  } catch (err) {
+    showTab('check');
+    showErr(errEl, '❌ ' + err.message);
+  }
+};
+
+function displayResults(data, targetBand) {
+  // Overall
+  document.getElementById('result-overall-circle').textContent = data.overall_band;
+  document.getElementById('result-overall').textContent = `Band ${data.overall_band}`;
+  document.getElementById('result-word-count').textContent = `${data.word_count || '–'} words`;
+  document.getElementById('improved-band-label').textContent = `Target: Band ${targetBand}`;
+
+  // Bars
+  const setBar = (id, score) => {
+    document.getElementById(`score-${id}`).textContent = score;
+    setTimeout(() => { document.getElementById(`bar-${id}`).style.width = `${(score / 9) * 100}%`; }, 100);
+  };
+  setBar('tr', data.task_response);
+  setBar('cc', data.coherence_cohesion);
+  setBar('lr', data.lexical_resource);
+  setBar('ga', data.grammatical_accuracy);
+
+  // Feedback
+  document.getElementById('feedback-strengths').textContent = data.strengths || '–';
+  document.getElementById('feedback-weaknesses').textContent = data.weaknesses || '–';
+  document.getElementById('feedback-suggestions').textContent = data.suggestions || '–';
+
+  // Errors
+  const errorsList = document.getElementById('errors-list');
+  const errors = data.errors || [];
+  document.getElementById('error-count').textContent = `${errors.length} found`;
+  errorsList.innerHTML = errors.length === 0
+    ? '<p class="text-sm text-gray-500 text-center py-2">No significant errors found 🎉</p>'
+    : errors.map(e => `
+      <div class="error-card error-${e.type || 'grammar'} rounded-xl p-3">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-xs font-semibold uppercase ${typeColor(e.type)}">${e.type || 'grammar'}</span>
+          <span class="text-xs text-gray-400">${e.severity || 'minor'}</span>
+        </div>
+        <p class="text-xs text-red-700 line-through mb-0.5">"${e.original}"</p>
+        <p class="text-xs text-emerald-700 font-medium mb-1">✓ "${e.correction}"</p>
+        <p class="text-xs text-gray-600">${e.explanation}</p>
+      </div>`).join('');
+
+  // Improved essay
+  document.getElementById('improved-essay').textContent = data.improved_essay || '–';
+}
+
+// ── History ──────────────────────────────────────
+let progressChart = null;
+
+window.loadHistory = async () => {
+  const historyList = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  historyList.innerHTML = '<p class="text-center text-gray-400 text-sm py-8">Loading...</p>';
+  emptyEl.style.display = 'none';
+  document.getElementById('chart-container').style.display = 'none';
+  document.getElementById('stats-cards').style.display = 'none';
+
+  try {
+    const q = query(collection(db, 'essays'), where('user_id', '==', auth.currentUser.uid), orderBy('created_at', 'desc'));
+    const snapshot = await getDocs(q);
+    const essays = [];
+    snapshot.forEach(doc => essays.push({ id: doc.id, ...doc.data() }));
+
+    if (essays.length === 0) {
+      historyList.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+
+    // Stats
+    const bands = essays.map(e => e.overall_band).filter(Boolean);
+    document.getElementById('stat-total').textContent = essays.length;
+    document.getElementById('stat-best').textContent = Math.max(...bands);
+    document.getElementById('stat-avg').textContent = (bands.reduce((a,b)=>a+b,0)/bands.length).toFixed(1);
+    document.getElementById('stats-cards').style.display = 'grid';
+
+    // Chart
+    if (essays.length >= 2) {
+      document.getElementById('chart-container').style.display = 'block';
+      const labels = essays.slice(0,10).reverse().map((e,i) => `Essay ${i+1}`);
+      const scores = essays.slice(0,10).reverse().map(e => e.overall_band);
+      if (progressChart) progressChart.destroy();
+      progressChart = new Chart(document.getElementById('progress-chart'), {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Band Score', data: scores, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#059669' }] },
+        options: { responsive: true, scales: { y: { min: 4, max: 9, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    // List
+    historyList.innerHTML = essays.map(e => {
+      const date = e.created_at?.toDate ? e.created_at.toDate().toLocaleDateString('en-US', {month:'short',day:'numeric'}) : 'Recently';
+      const snippet = (e.essay_text || '').substring(0, 80) + '...';
+      return `
+        <div class="card cursor-pointer hover:shadow-md transition-shadow" onclick="viewHistoryEssay('${e.id}')">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-500">${date} · ${e.task_type || 'Task 2'}</span>
+            <span class="font-bold text-emerald-600 text-lg">Band ${e.overall_band}</span>
+          </div>
+          <p class="text-xs text-gray-500 leading-relaxed">${snippet}</p>
+          <div class="flex gap-3 mt-2">
+            ${miniScore('TR', e.task_response)}
+            ${miniScore('CC', e.coherence_cohesion)}
+            ${miniScore('LR', e.lexical_resource)}
+            ${miniScore('GA', e.grammatical_accuracy)}
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    historyList.innerHTML = `<p class="text-red-500 text-sm text-center py-4">Error loading history: ${err.message}</p>`;
+  }
+};
+
+window.viewHistoryEssay = (id) => {
+  // Future: expand to show full essay details
+  alert('Full essay review coming soon!');
+};
+
+function miniScore(label, score) {
+  return `<span class="text-xs text-gray-500">${label}: <span class="font-semibold text-gray-700">${score||'–'}</span></span>`;
+}
+
+// ── Sample Essays ────────────────────────────────
+const SAMPLES = [
+  {
+    band: 7.5,
+    topic: "Technology & Society",
+    task: "Task 2",
+    prompt: "Some people believe that technology has made our lives more complex. Others say it has simplified our lives. Discuss both views.",
+    essay: `Technology has fundamentally transformed the way people live and work in the twenty-first century. While some argue that this transformation has added unnecessary complexity to our daily routines, others maintain that technology has made life considerably more convenient and efficient. This essay will explore both perspectives before reaching a conclusion.
+
+Those who believe technology has complicated modern life often point to the constant connectivity that smartphones and the internet demand. Professionals today are expected to respond to emails at any hour, blurring the boundaries between work and personal time. Furthermore, the rapid pace of technological change means that individuals must continuously update their skills, creating a sense of perpetual learning that many find exhausting.
+
+On the other hand, proponents of technology argue convincingly that it has removed countless inconveniences from everyday life. Online banking, for instance, has eliminated the need to visit physical branches, while navigation applications have made travel far less stressful. In healthcare, digital records allow doctors to access patient information instantly, potentially saving lives. The ability to communicate with family members across the globe at virtually no cost is another undeniable benefit.
+
+In my view, technology has ultimately simplified life more than it has complicated it, provided individuals develop healthy boundaries with digital tools. The benefits in productivity, communication, and access to information outweigh the challenges of adapting to new systems.`,
+    vocab: ["fundamentally transformed", "perpetual learning", "proponents", "blurring the boundaries"]
+  },
+  {
+    band: 6.5,
+    topic: "Education",
+    task: "Task 2",
+    prompt: "Some people think that children should begin learning a foreign language at primary school. Others believe it is better to wait until secondary school. Discuss both views.",
+    essay: `There is ongoing debate about the optimal age for children to start learning a foreign language. While some educators advocate for introducing second languages during primary school, others prefer to delay this until secondary education. Both positions have merit and will be examined in this essay.
+
+Supporters of early language learning argue that young children possess a remarkable capacity for acquiring new languages. Research suggests that the brain is more receptive to language patterns before puberty, allowing younger students to develop more natural pronunciation and fluency. Additionally, starting early gives children more years of practice before they reach adulthood.
+
+However, those who prefer secondary school introduction argue that children need to first establish a strong foundation in their mother tongue. Teaching a foreign language too early may cause confusion and could potentially interfere with literacy development in the first language. Secondary school students, being more mature, can also understand grammatical rules more effectively.
+
+Considering both arguments, I believe a balanced approach is most sensible. Basic exposure to foreign languages can begin in primary school through songs and games, while systematic instruction is better suited to secondary education when students can appreciate the structure of language more deeply.`,
+    vocab: ["optimal age", "remarkable capacity", "receptive", "systematic instruction"]
+  },
+  {
+    band: 8.0,
+    topic: "Environment",
+    task: "Task 2",
+    prompt: "The only way to solve traffic and pollution problems in cities is to encourage people to live and work in the countryside. To what extent do you agree?",
+    essay: `Urban traffic congestion and air pollution represent two of the most pressing challenges facing modern cities. While relocating populations to rural areas might seem like an intuitive solution, I would argue that this approach is neither fully practical nor the only viable option available to policymakers.
+
+Proponents of rural migration suggest that dispersing urban populations would naturally reduce the concentration of vehicles and industrial activity that generates pollution. Countries such as Singapore and the Netherlands have indeed experimented with policies that incentivise businesses to establish themselves outside major city centres, with some measurable success in reducing commuter traffic.
+
+Nevertheless, wholesale relocation of city dwellers is fundamentally impractical. Urban centres exist because of the agglomeration benefits they provide — specialised labour markets, infrastructure, and social amenities that cannot simply be duplicated in rural settings. Forcing populations to migrate would disrupt established communities and potentially damage economic productivity. Moreover, rural areas themselves may lack the infrastructure to absorb millions of new residents sustainably.
+
+A more effective strategy would involve a combination of targeted urban planning reforms. Expanding efficient public transportation networks, implementing congestion pricing, and promoting remote working — significantly accelerated by the pandemic — have already demonstrated their capacity to reduce urban traffic meaningfully. Green energy transitions in industry and electrification of vehicle fleets address pollution without displacing communities.
+
+In conclusion, while encouraging some degree of decentralisation may contribute to addressing these issues, framing rural migration as the only solution oversimplifies the problem considerably. A multifaceted approach tailored to each city's specific context will invariably prove more effective.`,
+    vocab: ["agglomeration benefits", "wholesale relocation", "congestion pricing", "decentralisation", "multifaceted"]
+  }
+];
+
+function loadSamples() {
+  const el = document.getElementById('samples-list');
+  el.innerHTML = SAMPLES.map((s, i) => `
+    <div class="card">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">${s.task}</span>
+          <span class="text-xs text-gray-500 ml-2">${s.topic}</span>
+        </div>
+        <span class="font-bold text-emerald-600">Band ${s.band}</span>
+      </div>
+      <p class="text-xs text-gray-500 italic mb-3">"${s.prompt}"</p>
+      <div id="sample-body-${i}" class="hidden">
+        <p class="text-sm text-gray-700 leading-relaxed mb-3">${s.essay.replace(/\n\n/g,'</p><p class="text-sm text-gray-700 leading-relaxed mb-3">')}</p>
+        <div class="bg-amber-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-amber-700 mb-1">📚 Key Vocabulary</p>
+          <div class="flex flex-wrap gap-1">${s.vocab.map(v=>`<span class="text-xs bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full">${v}</span>`).join('')}</div>
+        </div>
+      </div>
+      <button onclick="toggleSample(${i})" id="sample-btn-${i}" class="text-sm text-emerald-600 font-medium mt-2">Read Full Essay ↓</button>
+    </div>`).join('');
+}
+
+window.toggleSample = (i) => {
+  const body = document.getElementById(`sample-body-${i}`);
+  const btn = document.getElementById(`sample-btn-${i}`);
+  const hidden = body.classList.contains('hidden');
+  body.classList.toggle('hidden');
+  btn.textContent = hidden ? 'Hide Essay ↑' : 'Read Full Essay ↓';
+};
+
+// ── UI Helpers ───────────────────────────────────
+window.showTab = (tab) => {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('[id^="nav-"]').forEach(el => el.classList.remove('nav-active'));
+  const content = document.getElementById(`tab-${tab}`);
+  if (content) { content.classList.add('active'); content.classList.remove('fade-in'); void content.offsetWidth; content.classList.add('fade-in'); }
+  const nav = document.getElementById(`nav-${tab}`);
+  if (nav) nav.classList.add('nav-active');
+  if (tab === 'history') loadHistory();
+  if (tab === 'samples') loadSamples();
+};
+
+window.switchAuthTab = (tab) => {
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  document.getElementById('login-tab').className = tab === 'login' ? 'flex-1 py-2 text-sm font-semibold tab-active' : 'flex-1 py-2 text-sm font-semibold text-gray-500';
+  document.getElementById('register-tab').className = tab === 'register' ? 'flex-1 py-2 text-sm font-semibold tab-active' : 'flex-1 py-2 text-sm font-semibold text-gray-500';
+};
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+
+window.updateWordCount = () => {
+  const text = document.getElementById('essay-input').value.trim();
+  const count = text ? text.split(/\s+/).filter(w=>w.length>0).length : 0;
+  const el = document.getElementById('word-count');
+  el.textContent = `${count} words`;
+  el.className = `text-xs ${count < 100 ? 'text-red-400' : count >= 250 ? 'text-emerald-500 font-semibold' : 'text-gray-400'}`;
+};
+
+window.clearEssay = () => {
+  document.getElementById('essay-input').value = '';
+  updateWordCount();
+};
+
+window.copyImprovedEssay = () => {
+  const text = document.getElementById('improved-essay').textContent;
+  navigator.clipboard.writeText(text).then(() => alert('✅ Copied to clipboard!'));
+};
+
+function typeColor(type) {
+  const colors = { grammar: 'text-red-600', spelling: 'text-orange-500', vocabulary: 'text-yellow-600', logic: 'text-purple-600' };
+  return colors[type] || 'text-red-600';
+}
+
+function getFriendlyError(code) {
+  const map = { 'auth/user-not-found':'No account found with this email.', 'auth/wrong-password':'Incorrect password.', 'auth/email-already-in-use':'This email is already registered.', 'auth/invalid-email':'Please enter a valid email address.', 'auth/weak-password':'Password must be at least 6 characters.' };
+  return map[code] || 'Something went wrong. Please try again.';
+}
+
+function animateLoadingSteps() {
+  const steps = ['loading-step-2','loading-step-3','loading-step-4'];
+  steps.forEach((id, i) => {
+    setTimeout(() => {
+      document.getElementById(id).innerHTML = document.getElementById(id).innerHTML.replace('⏳','✅').replace('text-gray-400','text-green-600');
+    }, (i+1) * 6000);
+  });
+}
+</script>
+</body>
+</html>
